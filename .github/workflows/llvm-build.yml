@@ -1,9 +1,7 @@
-name: Build and Publish LLVM
+name: LLVM Build
 
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
@@ -17,22 +15,28 @@ jobs:
           - os: ubuntu-latest
             arch: arm64
     runs-on: ${{ matrix.os }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
 
+    steps:
       - name: Install Dependencies
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == "Linux" ]]; then
             sudo apt update
-            sudo apt install -y build-essential ninja-build clang cmake binutils-gold
+            sudo apt install -y build-essential ninja-build clang cmake binutils-gold git
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            brew install ninja llvm cmake
+            brew install ninja llvm cmake git
             export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
           elif [[ "$RUNNER_OS" == "Windows" ]]; then
-            choco install llvm cmake ninja
+            choco install llvm cmake ninja git
           fi
+
+      - name: Clone LLVM/Clang
+        shell: bash
+        run: |
+          git clone --depth=1 --branch=main https://github.com/llvm/llvm-project.git
+          mkdir -p llvm/tools
+          mv llvm-project/llvm llvm
+          mv llvm-project/clang llvm/tools/clang
 
       - name: Configure and Build LLVM
         shell: bash
@@ -52,8 +56,7 @@ jobs:
           ninja
           ninja install
 
-      - name: Archive LLVM binaries
-        if: success()
+      - name: Upload LLVM Build
         uses: actions/upload-artifact@v4
         with:
           name: llvm-${{ matrix.os }}-${{ matrix.arch }}
