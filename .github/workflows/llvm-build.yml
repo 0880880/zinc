@@ -27,10 +27,15 @@ jobs:
             brew install ninja llvm cmake git
             export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
           elif [[ "$RUNNER_OS" == "Windows" ]]; then
-            choco install llvm cmake ninja git
+            choco install llvm cmake ninja
+            # git is pre-installed on Windows runners
           fi
 
-      - name: Clone LLVM monorepo
+      - name: Checkout & Clone LLVM monorepo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # needed for full history if you later tag or checkout specific versions
+      - name: Clone LLVM/Clang
         shell: bash
         run: |
           git clone --depth=1 --branch=main https://github.com/llvm/llvm-project.git
