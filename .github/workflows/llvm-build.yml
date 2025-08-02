@@ -1,0 +1,60 @@
+name: Build and Publish LLVM
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        arch: [x64, arm64]
+        exclude:
+          - os: windows-latest
+            arch: arm64
+          - os: ubuntu-latest
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            sudo apt update
+            sudo apt install -y build-essential ninja-build clang cmake binutils-gold
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            brew install ninja llvm cmake
+            export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
+          elif [[ "$RUNNER_OS" == "Windows" ]]; then
+            choco install llvm cmake ninja
+          fi
+
+      - name: Configure and Build LLVM
+        shell: bash
+        run: |
+          mkdir -p build install
+          cd build
+          LINKER_FLAGS=""
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            LINKER_FLAGS="-DCMAKE_LINKER=/usr/bin/ld.gold"
+          fi
+          cmake -G Ninja ../llvm \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DLLVM_ENABLE_PROJECTS="clang" \
+            -DLLVM_TARGETS_TO_BUILD="host" \
+            -DCMAKE_INSTALL_PREFIX=../install \
+            $LINKER_FLAGS
+          ninja
+          ninja install
+
+      - name: Archive LLVM binaries
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: llvm-${{ matrix.os }}-${{ matrix.arch }}
+          path: install/

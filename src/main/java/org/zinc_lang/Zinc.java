@@ -30,7 +30,7 @@ import static org.lwjgl.llvm.LLVMExecutionEngine.*;
         },
         footer = {
                 "",
-                "For more information, visit https://github.com/your-repo/zinc"
+                "For more information, visit https://github.com/0880880/zinc"
         }
 )
 public class Zinc implements Runnable {
