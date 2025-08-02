@@ -1,0 +1,63 @@
+import org.gradle.internal.os.OperatingSystem
+
+plugins {
+    id 'java'
+}
+
+group = 'org.zinc_lang'
+version = '0.1'
+
+repositories {
+    mavenCentral()
+    maven {
+        url 'https://jitpack.io'
+        maven { url "https://central.sonatype.com/repository/maven-snapshots" }
+    }
+}
+
+project.ext.lwjglVersion = "3.4.0-SNAPSHOT"
+
+switch (OperatingSystem.current()) {
+    case OperatingSystem.FREE_BSD:
+        project.ext.lwjglNatives = "natives-freebsd"
+        break
+    case OperatingSystem.LINUX:
+        project.ext.lwjglNatives = "natives-linux"
+        def osArch = System.getProperty("os.arch")
+        if (osArch.startsWith("arm") || osArch.startsWith("aarch64")) {
+            project.ext.lwjglNatives += osArch.contains("64") || osArch.startsWith("armv8") ? "-arm64" : "-arm32"
+        } else if (osArch.startsWith("ppc")) {
+            project.ext.lwjglNatives += "-ppc64le"
+        } else if (osArch.startsWith("riscv")) {
+            project.ext.lwjglNatives += "-riscv64"
+        }
+        break
+    case OperatingSystem.MAC_OS:
+        project.ext.lwjglNatives = System.getProperty("os.arch").startsWith("aarch64") ? "natives-macos-arm64" : "natives-macos"
+        break
+    case OperatingSystem.WINDOWS:
+        def osArch = System.getProperty("os.arch")
+        project.ext.lwjglNatives = osArch.contains("64")
+                ? "natives-windows${osArch.startsWith("aarch64") ? "-arm64" : ""}"
+                : "natives-windows-x86"
+        break
+}
+
+dependencies {
+    implementation 'com.github.0880880:lwlp:v0.4.0'
+    implementation "com.github.tommyettinger:jdkgdxds:1.11.0"
+    implementation 'info.picocli:picocli:4.7.7'
+
+    implementation platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
+
+    implementation "org.lwjgl:lwjgl"
+    implementation "org.lwjgl:lwjgl-llvm"
+    implementation "org.lwjgl:lwjgl::$lwjglNatives"
+    implementation "org.lwjgl:lwjgl-llvm::$lwjglNatives"
+
+    implementation("commons-io:commons-io:2.20.0")
+}
+
+test {
+    useJUnitPlatform()
+}

@@ -1,0 +1,4 @@
+rootProject.name = 'oxid'
+include 'sh.oxid'
+include 'main'
+
