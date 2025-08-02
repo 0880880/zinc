@@ -30,18 +30,16 @@ jobs:
             choco install llvm cmake ninja git
           fi
 
-      - name: Clone LLVM/Clang
+      - name: Clone LLVM monorepo
         shell: bash
         run: |
           git clone --depth=1 --branch=main https://github.com/llvm/llvm-project.git
-          mkdir -p llvm/tools
-          mv llvm-project/llvm llvm
-          mv llvm-project/clang llvm/tools/clang
 
-      - name: Configure and Build LLVM
+      - name: Configure & Build
         shell: bash
         run: |
-          mkdir -p build install
+          cd llvm-project
+          mkdir build install
           cd build
           LINKER_FLAGS=""
           if [[ "$RUNNER_OS" == "Linux" ]]; then
@@ -56,8 +54,8 @@ jobs:
           ninja
           ninja install
 
-      - name: Upload LLVM Build
+      - name: Upload LLVM Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: llvm-${{ matrix.os }}-${{ matrix.arch }}
-          path: install/
+          path: llvm-project/install/
