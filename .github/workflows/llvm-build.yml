@@ -60,26 +60,9 @@ jobs:
           ninja
           ninja install
 
-      - name: Gather only shared libraries
-        if: matrix.os != 'windows-latest'
-        shell: bash
-        run: |
-          mkdir shared
-          # collect .so (and versioned .so.*) and .dylib
-          find llvm-project/install -type f \( -name "*.so*" -o -name "*.dylib" \) \
-                                 -exec cp --parents {} shared/ \;
-
-      - name: Gather only DLLs on Windows
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Path shared | Out-Null
-          Get-ChildItem llvm-project/install -Filter *.dll -Recurse |
-            Copy-Item -Destination shared -Container
-
       - name: Upload shared‐library artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: llvm-${{ matrix.os }}-${{ matrix.arch }}-shared
-          path: shared/
+          name: llvm-${{ matrix.os }}-${{ matrix.arch }}
+          path: ./llvm-project/build
 
