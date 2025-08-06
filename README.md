@@ -29,7 +29,7 @@ zinc run world.zn
 
 ```zinc
 // main.zn
-import zinc.fmt;
+import fmt;
 
 func main() int {
     fmt.println("Hello, world!");
