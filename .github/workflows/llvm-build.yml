@@ -55,6 +55,7 @@ jobs:
             -DLLVM_ENABLE_PROJECTS="clang" \
             -DLLVM_TARGETS_TO_BUILD="host" \
             -DCMAKE_INSTALL_PREFIX=../install \
+            -DBUILD_SHARED_LIBS=ON \
             $LINKER_FLAGS
           ninja
           ninja install
