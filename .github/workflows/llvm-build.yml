@@ -38,7 +38,8 @@ jobs:
         shell: pwsh
         run: |
           cd llvm-project
-          mkdir build install
+          mkdir build
+          mkdir install
           cd build
           cmake -G Ninja ../llvm `
             -DCMAKE_BUILD_TYPE=Release `
