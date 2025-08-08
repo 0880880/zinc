@@ -5,9 +5,14 @@ on:
 
 jobs:
   build:
+    # This prevents all other jobs from being cancelled if one fails
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, macos-13, windows-2025]
+        # Note: ubuntu-24.04-arm is not a standard GitHub-hosted runner.
+        # This workflow assumes you are using a self-hosted runner for that target.
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-14, macos-13, windows-2022]
+
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -15,50 +20,77 @@ jobs:
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == "Linux" ]]; then
-            sudo apt update
-            sudo apt install -y clang ninja-build
+            sudo apt-get update -y
+            sudo apt-get install -y clang ninja-build lld
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
             brew install ninja llvm
-            echo "/opt/homebrew/opt/llvm/bin" >> $GITHUB_PATH
+            # Add brew-installed LLVM to the path for both Apple Silicon and Intel
+            if [[ -d "/opt/homebrew/opt/llvm/bin" ]]; then
+              echo "/opt/homebrew/opt/llvm/bin" >> $GITHUB_PATH
+            elif [[ -d "/usr/local/opt/llvm/bin" ]]; then
+              echo "/usr/local/opt/llvm/bin" >> $GITHUB_PATH
+            fi
           elif [[ "$RUNNER_OS" == "Windows" ]]; then
-            choco install llvm ninja
+            # The windows runners have the MSVC toolchain pre-installed, which is
+            # the most stable way to build LLVM. We only need to install ninja.
+            # By not installing 'llvm' via choco, we avoid using MinGW which was
+            # causing the linker errors.
+            choco install ninja
           fi
 
-      - name: Checkout & Clone LLVM monorepo
+      # This single step checks out the LLVM source code correctly.
+      - name: Checkout LLVM Monorepo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # needed for full history if you later tag or checkout specific versions
-      - name: Clone LLVM/Clang
-        shell: bash
-        run: |
-          git clone --depth=1 --branch=main https://github.com/llvm/llvm-project.git
+          repository: llvm/llvm-project
+          ref: main
+          # Using a shallow clone (depth: 1) is much faster for CI builds.
+          fetch-depth: 1
 
-      - name: Configure & Build
+      - name: Configure & Build LLVM
         shell: bash
         run: |
+          # Create a directory for the final installed files, outside the source tree
+          mkdir ../install
+
           cd llvm-project
-          mkdir build install
-          cd build
-          LINKER_FLAGS=""
-          if [[ "$RUNNER_OS" == "Linux" ]]; then
-            LINKER_FLAGS="-DCMAKE_LINKER=/usr/bin/ld.gold"
-          fi
-          cmake -G Ninja ../llvm \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DLLVM_ENABLE_PROJECTS="clang" \
-            -DLLVM_TARGETS_TO_BUILD="host" \
-            -DCMAKE_INSTALL_PREFIX=../install \
-            -DBUILD_SHARED_LIBS=ON \
-            -DLLVM_BUILD_RUNTIME=ON \
-            -DLLVM_BUILD_EXECUTION_ENGINE=ON \
-            -DLLVM_INCLUDE_TESTS=ON \
-            $LINKER_FLAGS
-          ninja
-          ninja install
 
-      - name: Upload shared‐library artifacts
+          # Define CMake flags in a variable for clarity
+          CMAKE_FLAGS=(
+            -G Ninja
+            -DCMAKE_BUILD_TYPE=Release
+            -DLLVM_ENABLE_PROJECTS="clang"
+            -DLLVM_TARGETS_TO_BUILD="host"
+            -DCMAKE_INSTALL_PREFIX="$(pwd)/../install"
+            -DBUILD_SHARED_LIBS=ON
+            # CORE FIX: The flags below are the key to fixing the Windows link error.
+            # OrcJIT requires Run-Time Type Information (RTTI) and
+            # Exception Handling (EH) to be enabled.
+            -DLLVM_ENABLE_RTTI=ON
+            -DLLVM_ENABLE_EH=ON
+          )
+
+          # Add OS-specific flags
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            # Use the lld linker for a significant speed improvement
+            CMAKE_FLAGS+=(-DLLVM_USE_LINKER=lld)
+          fi
+
+          # Configure the build
+          echo "Configuring CMake with flags: ${CMAKE_FLAGS[@]}"
+          cmake -S llvm -B build "${CMAKE_FLAGS[@]}"
+
+          # Run the build using the modern, cross-platform cmake command
+          cmake --build build
+
+          # Install the built libraries and tools into the prefix directory
+          cmake --install build
+
+      - name: Upload shared-library artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: llvm-${{ matrix.os }}-${{ matrix.arch }}
-          path: ./llvm-project/build
-
+          # The runner context provides the architecture (e.g., X64, ARM64)
+          name: llvm-${{ matrix.os }}-${{ runner.arch }}
+          # CORRECTED PATH: The 'install' directory contains the final, usable
+          # artifacts, not the 'build' directory.
+          path: install/
