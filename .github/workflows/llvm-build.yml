@@ -43,7 +43,7 @@ jobs:
           cd build
           cmake -G Ninja ../llvm `
             -DCMAKE_BUILD_TYPE=Release `
-            -DLLVM_ENABLE_PROJECTS="clang" `
+            -DLLVM_ENABLE_PROJECTS="clang;orcjit" `
             -DLLVM_TARGETS_TO_BUILD="host" `
             -DCMAKE_INSTALL_PREFIX=../install `
             -DBUILD_SHARED_LIBS=ON `
